@@ -1,0 +1,35 @@
+# AlfaIA — .gitignore
+
+# Ambiente virtual Python
+venv/
+.venv/
+env/
+
+# Cache Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Arquivos de IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Arquivos gerados em runtime
+galeria/
+*.png
+*.jpg
+*.jpeg
+
+# Logs
+*.log
+
+# Dados sensíveis
+.env

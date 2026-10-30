@@ -1,0 +1,138 @@
+# Lista de nomes brasileiros comuns — data/nomes_br.txt
+# Usada pelo FeedbackEngine para comparar o que a criança escreveu
+# com nomes conhecidos via algoritmo de Levenshtein.
+#
+# Formato: um nome por linha (pode ser nome composto)
+# Fonte: nomes mais comuns no Brasil (IBGE + variações)
+#
+# Para adicionar o nome de um aluno específico, basta adicionar uma linha aqui.
+
+# ─── Nomes masculinos ─────────────────────────────────────────────────────────
+Miguel
+Arthur
+Heitor
+Theo
+Davi
+Gabriel
+Bernardo
+Samuel
+Lucas
+Pedro
+Mateus
+Rafael
+Enzo
+Guilherme
+Nicolas
+Felipe
+Vitor
+Eduardo
+Gustavo
+Daniel
+Leonardo
+Caio
+Henrique
+Murilo
+João
+João Pedro
+João Lucas
+João Gabriel
+João Vitor
+Carlos
+Paulo
+André
+Marcelo
+Diego
+Bruno
+Rodrigo
+Thiago
+Leandro
+Flávio
+Augusto
+Antônio
+Francisco
+Raimundo
+José
+Luiz
+Luis
+Roberto
+Ricardo
+
+# ─── Nomes femininos ──────────────────────────────────────────────────────────
+Sofia
+Alice
+Laura
+Isabella
+Valentina
+Julia
+Beatriz
+Isabela
+Helena
+Mariana
+Lara
+Camila
+Leticia
+Ana
+Luiza
+Maria
+Clara
+Vitoria
+Giovanna
+Livia
+Yasmin
+Manuela
+Fernanda
+Bianca
+Gabriela
+Larissa
+Natalia
+Renata
+Juliana
+Patricia
+Daniela
+Amanda
+Aline
+Bruna
+Sabrina
+Priscila
+Tatiana
+Vanessa
+Monica
+Sandra
+Claudia
+Cristina
+Roberta
+Simone
+Karina
+Debora
+Elaine
+Edilaine
+Aparecida
+Francisca
+
+# ─── Nomes compostos comuns ───────────────────────────────────────────────────
+Ana Luiza
+Ana Clara
+Ana Julia
+Ana Beatriz
+Maria Luiza
+Maria Eduarda
+Maria Clara
+Maria Fernanda
+Maria Vitoria
+Maria Gabriela
+Luiz Felipe
+Luiz Henrique
+Pedro Henrique
+Pedro Lucas
+João Victor
+Ana Laura
+Ana Carolina
+Ana Livia
+Ana Flavia
+Giovana
+
+# ─── Nomes da equipe do projeto (facilita testes) ────────────────────────────
+Miguel Augusto
+Ana Luiza Ferreira
+Maria Luiza Aguilar
+Pedro Antunes

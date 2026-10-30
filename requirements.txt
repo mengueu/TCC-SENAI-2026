@@ -1,0 +1,20 @@
+# Dependências do projeto AlfaIA — TCC SENAI 2026
+# Use Python 3.10, 3.11 ou 3.12
+# Instale com: pip install -r requirements.txt
+
+# Câmera e visão computacional (herdado do projeto da Semana Aberta)
+opencv-python
+mediapipe==0.10.14
+numpy
+
+# OCR — leitura da escrita da criança
+pytesseract
+
+# Similaridade de texto — comparar o que foi escrito com nomes/palavras esperadas
+python-Levenshtein
+
+# Síntese de voz — feedback sonoro para a criança
+pyttsx3
+
+# Processamento de imagem avançado (pré-processamento antes do OCR)
+Pillow
