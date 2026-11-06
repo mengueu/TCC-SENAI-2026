@@ -124,3 +124,4 @@ class GeradorProblema:
 
     def nome_operacao(self) -> str:
         return NOMES.get(self.tipo, self.tipo)
+

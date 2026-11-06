@@ -7,6 +7,13 @@ Mão que DESENHA:   indicador = escreve | palma = borracha | joia = confirma
 Mão que CONFIGURA: indicador no topo = paleta | pinça = espessura | aberta = limpa tudo
 """
 
+import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["GLOG_minloglevel"] = "2"
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 import math
 import cv2
 import numpy as np

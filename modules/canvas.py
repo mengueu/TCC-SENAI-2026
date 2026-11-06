@@ -108,37 +108,48 @@ class Canvas:
     def obter_canvas_para_ocr(self) -> np.ndarray:
         """
         Retorna uma versão do canvas otimizada para o OCR:
-          - Fundo branco, traço preto (Tesseract prefere isso)
-          - Recortada ao redor do texto (remove margens vazias)
-          - Redimensionada para altura mínima de 150 px
+          - Fundo branco, traço preto nítido (Tesseract prefere isso)
+          - Recortada ao redor do desenho (remove margens vazias)
+          - Engrossada corretamente (dilatação do traço enquanto ainda é branco)
+          - Redimensionada para altura de pelo menos 200 px
+          - Padding generoso nas bordas
         """
         cinza = cv2.cvtColor(self._canvas_display, cv2.COLOR_BGR2GRAY)
+        _, binaria = cv2.threshold(cinza, 25, 255, cv2.THRESH_BINARY)
 
-        # Inverte: fundo branco, traço escuro
-        invertida = cv2.bitwise_not(cinza)
-        _, binaria = cv2.threshold(invertida, 200, 255, cv2.THRESH_BINARY)
+        coords = cv2.findNonZero(binaria)
+        if coords is None:
+            # Nada desenhado: retorna imagem branca pequena
+            return np.ones((200, 200), dtype=np.uint8) * 255
 
-        # Dilata para engrossar o traço
-        kernel = np.ones((3, 3), np.uint8)
-        dilatada = cv2.dilate(binaria, kernel, iterations=1)
+        x, y, bw, bh = cv2.boundingRect(coords)
+        margem = 25
+        x1 = max(0, x - margem)
+        y1 = max(0, y - margem)
+        x2 = min(binaria.shape[1], x + bw + margem)
+        y2 = min(binaria.shape[0], y + bh + margem)
 
-        # Recorta ao bounding box do conteúdo (remove bordas em branco)
-        # Isso envia ao OCR só a região onde há escrita de fato
-        coords = cv2.findNonZero(cv2.bitwise_not(dilatada))  # pixels escuros = escrita
-        if coords is not None:
-            x, y, bw, bh = cv2.boundingRect(coords)
-            margem = 20
-            x  = max(0, x - margem)
-            y  = max(0, y - margem)
-            x2 = min(dilatada.shape[1], x + bw + margem * 2)
-            y2 = min(dilatada.shape[0], y + bh + margem * 2)
-            dilatada = dilatada[y:y2, x:x2]
+        recorte = binaria[y1:y2, x1:x2].copy()
 
-        # Garante altura mínima para o Tesseract (funciona melhor com imagens maiores)
-        h_atual = dilatada.shape[0]
-        if h_atual < 150:
-            escala = 150 / max(h_atual, 1)
-            nova_larg = int(dilatada.shape[1] * escala)
-            dilatada = cv2.resize(dilatada, (nova_larg, 150), interpolation=cv2.INTER_CUBIC)
+        # Engrossa o traço BRANCO (garante que linhas finas não quebrem)
+        kernel = np.ones((5, 5), np.uint8)
+        recorte = cv2.dilate(recorte, kernel, iterations=1)
 
-        return dilatada
+        # Garante altura mínima para o Tesseract
+        h_atual, w_atual = recorte.shape[:2]
+        if h_atual < 200:
+            escala = 200 / max(h_atual, 1)
+            nova_larg = max(1, int(w_atual * escala))
+            recorte = cv2.resize(recorte, (nova_larg, 200), interpolation=cv2.INTER_LANCZOS4)
+
+        # Inverte: fundo branco (255), traço preto (0)
+        invertida = cv2.bitwise_not(recorte)
+
+        # Padding nas bordas (essencial para o Tesseract segmentar)
+        pad = 40
+        final = cv2.copyMakeBorder(
+            invertida, pad, pad, pad, pad,
+            cv2.BORDER_CONSTANT, value=255,
+        )
+
+        return final

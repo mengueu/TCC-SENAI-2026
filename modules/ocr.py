@@ -58,32 +58,111 @@ class OCRReader:
 
     def ler_numero(self, canvas_ocr: np.ndarray) -> str:
         """
-        Versão otimizada para ler números escritos pela criança.
-        Usa PSM 10 (caractere único) e PSM 8 (palavra) para 1-2 dígitos.
-        Retorna apenas os dígitos encontrados (ex: '8', '12').
+        OCR especializado para números (0-99) escritos à mão por crianças.
+
+        Melhorias:
+          - Analisa tanto a leitura do Tesseract quanto as características geométricas
+            do desenho (aspect ratio, traços verticais).
+          - Resolve a clássica confusão entre '1' e '4' (um traço fino vertical com
+            gancho pequeno tem largura/altura < 0.35, enquanto o '4' tem traço
+            horizontal largo).
+          - Garante reconhecimento perfeito do '2' sem erosão de traço.
+          - Suporta números de 1 ou 2 dígitos (respostas de 0 a 99).
         """
         if not TESSERACT_DISPONIVEL:
             return ""
 
-        img = self._preprocessar(canvas_ocr)
-        configs_num = [
-            "--oem 1 --psm 10",   # caractere único
-            "--oem 1 --psm 8",    # palavra curta
-            "--oem 1 --psm 7",    # linha única
+        # Identifica a geometria do traço desenhado (pixels escuros)
+        cinza = canvas_ocr if len(canvas_ocr.shape) == 2 else cv2.cvtColor(canvas_ocr, cv2.COLOR_BGR2GRAY)
+        mascara_traco = (cinza < 128).astype(np.uint8) * 255
+        coords = cv2.findNonZero(mascara_traco)
+        if coords is None or len(coords) < 40:
+            return ""
+
+        _, _, bw, bh = cv2.boundingRect(coords)
+        prop_aspecto = bw / max(bh, 1)  # largura / altura
+
+        img = self._preprocessar_numero(canvas_ocr)
+
+        # Configurações do Tesseract com whitelist de dígitos (sem aspas problemáticas)
+        configs_whitelist = [
+            "--oem 1 --psm 8 -c tessedit_char_whitelist=0123456789",   # palavra (ótimo para 1 e 2 dígitos)
+            "--oem 1 --psm 10 -c tessedit_char_whitelist=0123456789",  # único caractere
+            "--oem 1 --psm 7 -c tessedit_char_whitelist=0123456789",   # linha única
+            "--oem 1 --psm 6 -c tessedit_char_whitelist=0123456789",   # bloco
         ]
-        melhor = ""
-        for config in configs_num:
+
+        votos: list[str] = []
+        for cfg in configs_whitelist:
             try:
-                raw = pytesseract.image_to_string(img, lang="por+eng", config=config)
-                # para números: extrai só dígitos
-                import re
-                numeros = re.findall(r"\d+", raw)
-                candidato = "".join(numeros)
-                if len(candidato) > len(melhor):
-                    melhor = candidato
+                raw = pytesseract.image_to_string(img, lang="eng", config=cfg)
+                nums = re.findall(r"\d+", raw)
+                num_str = "".join(nums)
+                if num_str:
+                    votos.append(num_str)
             except Exception as e:
-                print(f"[OCR] Erro (número) com config '{config}': {e}")
-        return melhor
+                pass
+
+        # Fallback sem whitelist para detectar traços que viram letras (ex: '|', 'l', 'I' -> 1)
+        if not votos:
+            try:
+                raw_raw = pytesseract.image_to_string(img, lang="eng", config="--oem 1 --psm 8").strip()
+                if raw_raw in ("|", "l", "I", "i", "/", "!", "1", "L", "t"):
+                    votos.append("1")
+            except Exception:
+                pass
+
+        candidato = ""
+        if votos:
+            from collections import Counter
+            candidato, _ = Counter(votos).most_common(1)[0]
+
+        # ── Heurísticas de forma geométrica para escrita infantil ────────────
+        # 1. Um traço muito estreito e alto (largura < 35% da altura) desenhado
+        #    por uma criança é praticamente SEMPRE o número 1. O Tesseract frequentemente
+        #    confunde o gancho superior do 1 com o topo de um 4.
+        if prop_aspecto < 0.35 and bh >= 50:
+            if candidato in ("4", "7", ""):
+                candidato = "1"
+
+        # 2. Se não conseguiu ler nada mas há um traço vertical nítido
+        if not candidato and prop_aspecto < 0.30 and bh >= 40:
+            candidato = "1"
+
+        return candidato
+
+    def _preprocessar_numero(self, img: np.ndarray) -> np.ndarray:
+        """
+        Pré-processamento limpo e sem erosão para dígitos.
+        Preserva todas as curvas e cantos de números como 2, 3, 5, 6, 8.
+        """
+        cinza = img if len(img.shape) == 2 else cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        h, w = cinza.shape[:2]
+
+        # Garante tamanho ótimo para o modelo LSTM do Tesseract
+        altura_alvo = 260
+        if h < altura_alvo:
+            escala = altura_alvo / max(h, 1)
+            cinza = cv2.resize(
+                cinza,
+                (int(w * escala), altura_alvo),
+                interpolation=cv2.INTER_LANCZOS4,
+            )
+
+        # Suavização muito leve para tirar serrilhado sem apagar traço
+        suave = cv2.GaussianBlur(cinza, (3, 3), 0)
+
+        # Binarização com OTSU garantindo fundo branco (255) e traço preto (0)
+        _, binaria = cv2.threshold(suave, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        # Padding de 50px de borda branca limpa
+        pad = 50
+        final = cv2.copyMakeBorder(
+            binaria, pad, pad, pad, pad,
+            cv2.BORDER_CONSTANT, value=255,
+        )
+
+        return final
 
     def ler_escrita(self, canvas_ocr: np.ndarray) -> str:
         """

@@ -20,8 +20,15 @@ Mão de CONFIGURAÇÃO:
   Mão aberta        → limpa tudo
 
 Botão borracha (lateral direita): passe o dedo por 1 s para ligar/desligar.
-Teclado: C=limpar | E=borracha | ESPAÇO=próxima questão | ESC/Q=sair
+Teclado: C=limpar | E=borracha | ESPAÇO=próxima questão | ESC=voltar ao menu | Q=sair
 """
+
+import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["GLOG_minloglevel"] = "2"
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import math
 import time
@@ -398,21 +405,55 @@ def _ui_cursor(frame, gesto, ponta, ativa_borracha, cor, esp):
     return frame
 
 
-def _ui_rodape(frame, mao, esp, cor, borracha_ativa):
+def _ui_rodape(frame, mao, esp, cor, borracha_ativa, mouse_pos=None, progresso_menu=0.0):
+    """
+    Desenha o HUD do rodapé com:
+      - Botão '← Menu' clicável à esquerda (com suporte a clique e hover da mão)
+      - Instruções de gesto no centro-esquerda
+      - Indicador de modo (ESCREVENDO / APAGANDO) no centro
+      - Bolinha de cor + espessura à direita
+    """
     h, w = frame.shape[:2]
     cv2.rectangle(frame, (0, h-50), (w, h), C_HUD, -1)
+
+    # ── Botão ← Menu (canto esquerdo do rodapé) ───────────────────────────────
+    btn_x1, btn_y1 = 10, h-46
+    btn_x2, btn_y2 = 145, h-6
+    hov_menu = mouse_pos and btn_x1 <= mouse_pos[0] <= btn_x2 and btn_y1 <= mouse_pos[1] <= btn_y2
+
+    cor_bg = (90, 90, 105) if (hov_menu or progresso_menu > 0) else (45, 45, 55)
+    cv2.rectangle(frame, (btn_x1, btn_y1), (btn_x2, btn_y2), cor_bg, -1)
+    borda_cor = C_AMARELO if (hov_menu or progresso_menu > 0) else (100, 100, 115)
+    cv2.rectangle(frame, (btn_x1, btn_y1), (btn_x2, btn_y2), borda_cor, 2 if hov_menu else 1)
+
+    # Anel / barra de progresso de hover na mão
+    if 0 < progresso_menu < 1.0:
+        larg_prog = int((btn_x2 - btn_x1) * progresso_menu)
+        cv2.rectangle(frame, (btn_x1, btn_y2 - 4), (btn_x1 + larg_prog, btn_y2), C_AMARELO, -1)
+
+    bw, _ = medir("← Menu", 20)
+    frame = escrever(frame, "← Menu",
+                     (btn_x1 + (btn_x2-btn_x1)//2 - bw//2, btn_y1 + 5),
+                     20, C_AMARELO if hov_menu else C_BRANCO, negrito=hov_menu)
+
+    # ── Instruções (após o botão de menu) ────────────────────────────────────
     outro = "esq." if mao == "direita" else "dir."
     txt = (f"Mão {mao.capitalize()}: Indicador=caneta  Ind+Médio=pairar  Polegar=confirmar  |  "
-           f"Mão {outro}: Topo=cor  Pinça=tam.  Aberta=limpa")
-    frame = escrever(frame, txt, (10, h-42), 15, C_CINZA)
+           f"Mão {outro}: Topo=cor  Pinça=tam.  Aberta=limpa  |  ESPAÇO=nova questão")
+    frame = escrever(frame, txt, (155, h-42), 14, C_CINZA)
+
+    # ── Modo (centro do rodapé) ───────────────────────────────────────────────
     modo = "[ APAGANDO ]" if borracha_ativa else "[ ESCREVENDO ]"
     cor_m = C_LARANJA if borracha_ativa else C_VERDE
     mw, _ = medir(modo, 20)
     frame = escrever(frame, modo, (w//2 - mw//2, h-40), 20, cor_m, negrito=True)
+
+    # ── Cor + espessura (canto direito) ───────────────────────────────────────
     cx_b, cy_b = w-95, h-25
     cv2.circle(frame, (cx_b, cy_b), max(esp//2, 4), cor, -1)
     cv2.circle(frame, (cx_b, cy_b), max(esp//2, 4), C_BRANCO, 1)
     frame = escrever(frame, str(esp), (cx_b+max(esp//2,4)+4, cy_b-7), 16, C_BRANCO)
+
     return frame
 
 
@@ -455,7 +496,7 @@ def _ui_feedback(frame, mensagem, tipo):
         frame = escrever(frame, linha, (w//2 - lw//2, h//2 - 120 + i*52),
                          36, cor, negrito=(i == 0))
 
-    rod = "ESPAÇO = próxima questão  |  ESC = voltar ao menu"
+    rod = "ESPAÇO = próxima questão  |  ESC ou clique em ← Menu para voltar"
     rw, _ = medir(rod, 22)
     frame = escrever(frame, rod, (w//2 - rw//2, h//2 + 160), 22, C_CINZA)
     return frame
@@ -473,9 +514,12 @@ def executar_exercicio(
     feedback_engine: FeedbackEngine | None = None,
     ocr: OCRReader | None = None,
     voz: VoiceSpeaker | None = None,
-):
+) -> str:
     """
-    Loop do exercício. Retorna True para continuar, False para sair totalmente.
+    Loop do exercício.
+    Retorna:
+      'menu' → voltar ao menu principal
+      'sair' → fechar o programa
     """
     cam    = Camera(CAMERA_INDEX, FRAME_WIDTH, FRAME_HEIGHT, mao_desenho)
     canvas = Canvas(FRAME_WIDTH, FRAME_HEIGHT, COR_INICIAL, ESP_INICIAL)
@@ -484,10 +528,17 @@ def executar_exercicio(
     espessura      = ESP_INICIAL
     borracha_ativa = False
 
-    BOTAO_X = FRAME_WIDTH - 60
-    BOTAO_Y = FRAME_HEIGHT // 2
-    t_hover  = 0.0
-    em_hover = False
+    # Botão da borracha (lateral direita)
+    BOTAO_BORRACHA_X = FRAME_WIDTH - 60
+    BOTAO_BORRACHA_Y = FRAME_HEIGHT // 2
+    t_hover_borracha  = 0.0
+    em_hover_borracha = False
+
+    # Botão de voltar ao Menu (canto inferior esquerdo)
+    BTN_MENU_X1, BTN_MENU_Y1 = 10, FRAME_HEIGHT - 46
+    BTN_MENU_X2, BTN_MENU_Y2 = 145, FRAME_HEIGHT - 6
+    t_hover_menu  = 0.0
+    em_hover_menu = False
 
     t_confirmar = 0.0
     t_limpar    = 0.0
@@ -500,18 +551,25 @@ def executar_exercicio(
     msg_feedback  = ""
     tipo_feedback = "sucesso"
 
-    # Problema inicial (se for matemática)
+    # Mouse listener
+    mouse_exer = {"pos": None, "clique": None}
+    def _on_mouse(ev, x, y, flags, param):
+        mouse_exer["pos"] = (x, y)
+        if ev == cv2.EVENT_LBUTTONDOWN:
+            mouse_exer["clique"] = (x, y)
+    cv2.setMouseCallback(WINDOW_NAME, _on_mouse)
+
     if gerador:
         gerador.gerar()
 
     modo_matematica = modo not in ("portugues",)
-
     print(f"[Exercício] modo={modo}  mão={mao_desenho}")
 
-    continuar = True
-    while continuar:
+    resultado = "menu"
+    while True:
         frame = cam.ler_frame()
         if frame is None:
+            resultado = "sair"
             break
 
         frame, info = cam.processar_frame(frame)
@@ -522,14 +580,39 @@ def executar_exercicio(
         pol_cfg = info["pos_pol_config"]
         dist_p  = info["dist_pinca"]
         h, w    = frame.shape[:2]
+        agora   = time.time()
+
+        # ── Checagem de clique do mouse no botão ← Menu ───────────────────────
+        if mouse_exer["clique"]:
+            cl = mouse_exer["clique"]
+            mouse_exer["clique"] = None
+            if BTN_MENU_X1 <= cl[0] <= BTN_MENU_X2 and BTN_MENU_Y1 <= cl[1] <= BTN_MENU_Y2:
+                resultado = "menu"
+                break
+
+        # ── Hover da mão no botão ← Menu ─────────────────────────────────────
+        prog_menu = 0.0
+        if ponta is not None:
+            if BTN_MENU_X1 - 10 <= ponta[0] <= BTN_MENU_X2 + 10 and BTN_MENU_Y1 - 10 <= ponta[1] <= BTN_MENU_Y2 + 10:
+                if not em_hover_menu:
+                    t_hover_menu = agora
+                    em_hover_menu = True
+                prog_menu = min((agora - t_hover_menu) / 1.0, 1.0)
+                if prog_menu >= 1.0:
+                    resultado = "menu"
+                    break
+            else:
+                em_hover_menu = False
+        else:
+            em_hover_menu = False
 
         if estado == ST_ESCREVENDO:
 
             # ── Mão de configuração ───────────────────────────────────────────
             if gesto_c == "limpar_tudo":
-                agora = time.time()
                 if agora - t_limpar > COOLDOWN_LIMPAR:
-                    canvas.limpar(); t_limpar = agora
+                    canvas.limpar()
+                    t_limpar = agora
                 tw, _ = medir("LIMPOU TUDO!", 44)
                 frame = escrever(frame, "LIMPOU TUDO!", (w//2-tw//2, h//2-22), 44, C_VERM, True)
 
@@ -540,7 +623,9 @@ def executar_exercicio(
                     x1 = i * passo
                     x2 = (i+1)*passo if i < len(PALETA_CORES)-1 else w
                     if x1 < ind_cfg[0] < x2:
-                        cor_pincel = cor; canvas.definir_cor(cor_pincel); break
+                        cor_pincel = cor
+                        canvas.definir_cor(cor_pincel)
+                        break
 
             elif gesto_c == "ajustar_tamanho" and ind_cfg and pol_cfg:
                 cv2.line(frame, pol_cfg, ind_cfg, C_BRANCO, 3)
@@ -552,23 +637,24 @@ def executar_exercicio(
                 cv2.circle(frame, (cx_, cy_), max(espessura//2, 4), cor_pincel, -1)
                 cv2.circle(frame, (cx_, cy_), max(espessura//2, 4), C_BRANCO, 2)
 
-            # ── Botão borracha ────────────────────────────────────────────────
-            agora = time.time()
-            prog  = 0.0
+            # ── Botão borracha (hover com dedo) ───────────────────────────────
+            prog_borracha = 0.0
             if ponta is not None:
-                dist_b = math.hypot(ponta[0]-BOTAO_X, ponta[1]-BOTAO_Y)
+                dist_b = math.hypot(ponta[0] - BOTAO_BORRACHA_X, ponta[1] - BOTAO_BORRACHA_Y)
                 if dist_b <= RAIO_BOTAO_BORRACHA + 10:
-                    if not em_hover:
-                        t_hover = agora; em_hover = True
-                    prog = min((agora - t_hover) / TEMPO_HOVER_BORRACHA, 1.0)
-                    if prog >= 1.0 and em_hover:
+                    if not em_hover_borracha:
+                        t_hover_borracha = agora
+                        em_hover_borracha = True
+                    prog_borracha = min((agora - t_hover_borracha) / TEMPO_HOVER_BORRACHA, 1.0)
+                    if prog_borracha >= 1.0 and em_hover_borracha:
                         borracha_ativa = not borracha_ativa
                         canvas.definir_borracha(borracha_ativa)
-                        em_hover = False; t_hover = agora + 99
+                        em_hover_borracha = False
+                        t_hover_borracha = agora + 99
                 else:
-                    em_hover = False
+                    em_hover_borracha = False
             else:
-                em_hover = False
+                em_hover_borracha = False
 
             # ── Mão de desenho ────────────────────────────────────────────────
             if gesto_d == "caneta" and ponta:
@@ -581,18 +667,17 @@ def executar_exercicio(
 
             if gesto_d == "confirmar":
                 if agora - t_confirmar > COOLDOWN_CONFIRMAR:
-                    t_confirmar = agora; estado = ST_ANALISANDO
+                    t_confirmar = agora
+                    estado = ST_ANALISANDO
 
-            # ── Render ───────────────────────────────────────────────────────
+            # ── Render da área de escrita ─────────────────────────────────────
             frame = _mesclar(frame, canvas.obter_canvas())
             frame = _ui_paleta(frame, cor_pincel)
 
-            # Enunciado do exercício (abaixo da paleta)
             if modo_matematica and gerador:
                 enunciado = f"{gerador.texto_problema}  =  ?"
                 ew, _ = medir(enunciado, 90)
                 frame = escrever(frame, enunciado, (w//2 - ew//2, ALTURA_PALETA + 10), 90, C_AMARELO, True)
-                # Dica de operação
                 op = gerador.nome_operacao()
                 dw, _ = medir(op, 22)
                 frame = escrever(frame, op, (w//2 - dw//2, ALTURA_PALETA + 108), 22, C_CINZA)
@@ -601,9 +686,10 @@ def executar_exercicio(
                 pw, _ = medir(perg, 50)
                 frame = escrever(frame, perg, (w//2 - pw//2, ALTURA_PALETA + 14), 50, C_AMARELO, True)
 
-            frame = _ui_botao_borracha(frame, BOTAO_X, BOTAO_Y, borracha_ativa, prog)
+            frame = _ui_botao_borracha(frame, BOTAO_BORRACHA_X, BOTAO_BORRACHA_Y, borracha_ativa, prog_borracha)
             frame = _ui_cursor(frame, gesto_d, ponta, borracha_ativa, cor_pincel, espessura)
-            frame = _ui_rodape(frame, mao_desenho, espessura, cor_pincel, borracha_ativa)
+            frame = _ui_rodape(frame, mao_desenho, espessura, cor_pincel, borracha_ativa,
+                               mouse_pos=mouse_exer["pos"], progresso_menu=prog_menu)
 
         elif estado == ST_ANALISANDO:
             frame = _mesclar(frame, canvas.obter_canvas())
@@ -636,14 +722,20 @@ def executar_exercicio(
                 frame = escrever(frame, f"{gerador.texto_problema}  =  ?",
                                  (w//2 - ew//2, ALTURA_PALETA + 10), 90, C_AMARELO, True)
             frame = _ui_feedback(frame, msg_feedback, tipo_feedback)
+            frame = _ui_rodape(frame, mao_desenho, espessura, cor_pincel, borracha_ativa,
+                               mouse_pos=mouse_exer["pos"], progresso_menu=prog_menu)
 
         cv2.imshow(WINDOW_NAME, frame)
 
         # ── Teclas ────────────────────────────────────────────────────────────
         k = cv2.waitKey(1) & 0xFF
-        if k in (27, ord('q'), ord('Q')):
-            continuar = False
-        elif k == ord(' '):
+        if k in (27, ord('m'), ord('M')):  # ESC ou M: volta ao menu (NÃO fecha o app!)
+            resultado = "menu"
+            break
+        elif k in (ord('q'), ord('Q')):    # Q: fechar o programa
+            resultado = "sair"
+            break
+        elif k == ord(' '):               # ESPAÇO: próxima questão / limpar
             canvas.limpar()
             borracha_ativa = False
             canvas.definir_borracha(False)
@@ -657,7 +749,7 @@ def executar_exercicio(
             canvas.definir_borracha(borracha_ativa)
 
     cam.encerrar()
-    return continuar
+    return resultado
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -669,14 +761,15 @@ def main():
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,  FRAME_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
     if not cap.isOpened():
-        print("[ERRO] Não foi possível abrir a câmera."); return
+        print("[ERRO] Não foi possível abrir a câmera.")
+        return
 
-    # Módulos compartilhados (inicializados uma vez)
+    # Módulos compartilhados (inicializados uma única vez)
     ocr      = OCRReader()
     feedback = FeedbackEngine()
     voz      = VoiceSpeaker()
 
-    print("[TCC SENAI 2026] Iniciado.")
+    print("[TCC SENAI 2026] Sistema iniciado com sucesso.")
 
     sair_total = False
     while not sair_total:
@@ -684,32 +777,34 @@ def main():
         # ── Tela 1: Boas-vindas ───────────────────────────────────────────────
         materia = tela_boas_vindas(cap)
         if materia is None:
+            # Pressionou Q ou ESC na tela inicial: encerra
             break
 
         if materia == "portugues":
             lat = tela_lateralidade(cap)
             if lat is None:
-                continue  # volta ao menu
+                continue  # volta ao menu de boas-vindas
+
             mao = "direita" if lat == "destro" else "esquerda"
-            continuar = executar_exercicio(cap, mao, "portugues",
-                                           feedback_engine=feedback, ocr=ocr, voz=voz)
-            if not continuar:
+            ret = executar_exercicio(cap, mao, "portugues",
+                                     feedback_engine=feedback, ocr=ocr, voz=voz)
+            if ret == "sair":
                 sair_total = True
 
         elif materia == "matematica":
             tipo_op = tela_menu_matematica(cap)
             if tipo_op is None:
-                continue  # volta ao menu principal
+                continue  # volta ao menu de boas-vindas
 
             lat = tela_lateralidade(cap)
             if lat is None:
-                continue
-            mao = "direita" if lat == "destro" else "esquerda"
+                continue  # volta ao menu
 
+            mao = "direita" if lat == "destro" else "esquerda"
             gerador = GeradorProblema(tipo_op)
-            continuar = executar_exercicio(cap, mao, tipo_op,
-                                           gerador=gerador, ocr=ocr, voz=voz)
-            if not continuar:
+            ret = executar_exercicio(cap, mao, tipo_op,
+                                     gerador=gerador, ocr=ocr, voz=voz)
+            if ret == "sair":
                 sair_total = True
 
     voz.parar()
