@@ -18,6 +18,8 @@ import re
 import cv2
 import numpy as np
 
+from modules.caminhos import obter_tesseract_cmd, obter_caminho_recurso
+
 try:
     import pytesseract
     TESSERACT_DISPONIVEL = True
@@ -25,8 +27,8 @@ except ImportError:
     TESSERACT_DISPONIVEL = False
     print("[OCR] AVISO: pytesseract nao instalado. Execute: pip install pytesseract")
 
-# ─── Caminho do Tesseract no Windows ─────────────────────────────────────────
-TESSERACT_PATH = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+# ─── Caminho dinâmico do Tesseract (portátil ou do sistema) ─────────────────
+TESSERACT_PATH = obter_tesseract_cmd()
 
 # ─── Configurações a tentar (em ordem de preferência) ────────────────────────
 # PSM 8  → Trata a imagem como uma única PALAVRA  (ótimo para nomes curtos)

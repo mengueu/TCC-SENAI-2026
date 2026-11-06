@@ -95,7 +95,8 @@ class FeedbackEngine:
     # ─────────────────────────────────────────────────────────────────────────
 
     def _carregar_nomes(self) -> list[str]:
-        caminho = Path(__file__).parent.parent / "data" / "nomes_br.txt"
+        from modules.caminhos import obter_caminho_recurso
+        caminho = obter_caminho_recurso("data/nomes_br.txt")
         if caminho.exists():
             with open(caminho, encoding="utf-8") as f:
                 return [l.strip().title() for l in f
