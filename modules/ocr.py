@@ -56,6 +56,35 @@ class OCRReader:
                 print(f"[OCR] AVISO: Tesseract nao encontrado. Erro: {e}")
                 print(f"      Ajuste TESSERACT_PATH em modules/ocr.py")
 
+    def ler_numero(self, canvas_ocr: np.ndarray) -> str:
+        """
+        Versão otimizada para ler números escritos pela criança.
+        Usa PSM 10 (caractere único) e PSM 8 (palavra) para 1-2 dígitos.
+        Retorna apenas os dígitos encontrados (ex: '8', '12').
+        """
+        if not TESSERACT_DISPONIVEL:
+            return ""
+
+        img = self._preprocessar(canvas_ocr)
+        configs_num = [
+            "--oem 1 --psm 10",   # caractere único
+            "--oem 1 --psm 8",    # palavra curta
+            "--oem 1 --psm 7",    # linha única
+        ]
+        melhor = ""
+        for config in configs_num:
+            try:
+                raw = pytesseract.image_to_string(img, lang="por+eng", config=config)
+                # para números: extrai só dígitos
+                import re
+                numeros = re.findall(r"\d+", raw)
+                candidato = "".join(numeros)
+                if len(candidato) > len(melhor):
+                    melhor = candidato
+            except Exception as e:
+                print(f"[OCR] Erro (número) com config '{config}': {e}")
+        return melhor
+
     def ler_escrita(self, canvas_ocr: np.ndarray) -> str:
         """
         Recebe a imagem do canvas (saída de Canvas.obter_canvas_para_ocr())
