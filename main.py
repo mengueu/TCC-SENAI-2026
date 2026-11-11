@@ -24,6 +24,10 @@ Teclado: C=limpar | E=borracha | ESPAÇO=próxima questão | ESC=voltar ao menu 
 """
 
 import os
+import sys
+import logging
+from pathlib import Path
+
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["GLOG_minloglevel"] = "2"
 import warnings
@@ -42,6 +46,135 @@ from modules.feedback   import FeedbackEngine
 from modules.matematica import GeradorProblema
 from modules.tts        import VoiceSpeaker
 from modules.texto      import escrever, medir
+
+
+def setup_logging():
+    """Configura logging seguro em arquivo para depuração em computadores de teste."""
+    try:
+        if getattr(sys, "frozen", False):
+            base_dir = Path(sys.executable).resolve().parent
+        else:
+            base_dir = Path(__file__).resolve().parent
+        log_path = base_dir / "alfaia_debug.log"
+
+        file_handler = logging.FileHandler(str(log_path), mode="w", encoding="utf-8")
+        file_handler.setLevel(logging.INFO)
+        formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+        file_handler.setFormatter(formatter)
+
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.INFO)
+        root_logger.addHandler(file_handler)
+
+        class LogStream:
+            def __init__(self, level_fn, fallback_stream, handler):
+                self.level_fn = level_fn
+                self.fallback = fallback_stream
+                self.handler = handler
+            def write(self, msg):
+                if msg and msg.strip():
+                    self.level_fn(msg.strip())
+                    try:
+                        self.handler.flush()
+                    except Exception:
+                        pass
+                if self.fallback:
+                    try:
+                        self.fallback.write(msg)
+                    except Exception:
+                        pass
+            def flush(self):
+                try:
+                    self.handler.flush()
+                except Exception:
+                    pass
+                if self.fallback:
+                    try:
+                        self.fallback.flush()
+                    except Exception:
+                        pass
+
+        sys.stdout = LogStream(logging.info, sys.stdout, file_handler)
+        sys.stderr = LogStream(logging.error, sys.stderr, file_handler)
+        logging.info("Sistema de logs AlfaIA inicializado com sucesso.")
+        file_handler.flush()
+    except Exception:
+        pass
+
+
+class CameraMock:
+    """Simulador de câmera caso o computador não possua webcam conectada."""
+    def __init__(self, largura: int = 1280, altura: int = 720):
+        self.largura = largura
+        self.altura  = altura
+        self._is_opened = True
+
+    def isOpened(self) -> bool:
+        return self._is_opened
+
+    def read(self) -> tuple[bool, np.ndarray]:
+        frame = np.zeros((self.altura, self.largura, 3), np.uint8)
+        return True, frame
+
+    def set(self, prop, val):
+        return True
+
+    def release(self):
+        self._is_opened = False
+
+
+def conectar_camera(largura: int = 1280, altura: int = 720) -> tuple[cv2.VideoCapture | CameraMock | None, bool]:
+    """
+    Tenta abrir a webcam testando múltiplos índices e backends do Windows (DirectShow e MSMF).
+    Se não encontrar, exibe popup perguntando se deseja abrir no Modo Demonstração (com o mouse).
+    Retorna (camera, eh_simulado).
+    """
+    print("[Câmera] Procurando dispositivos de vídeo...")
+    tentativas = [
+        (0, cv2.CAP_DSHOW),
+        (1, cv2.CAP_DSHOW),
+        (2, cv2.CAP_DSHOW),
+        (0, cv2.CAP_ANY),
+        (1, cv2.CAP_ANY),
+    ]
+
+    for idx, backend in tentativas:
+        try:
+            cap = cv2.VideoCapture(idx, backend)
+            if cap.isOpened():
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, largura)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, altura)
+                ret, frame = cap.read()
+                if ret and frame is not None and frame.size > 0:
+                    print(f"[Câmera] Webcam detectada e aberta no índice {idx} (backend={backend}).")
+                    return cap, False
+                cap.release()
+        except Exception as e:
+            print(f"[Câmera] Tentativa no índice {idx} falhou: {e}")
+
+    # Nenhuma webcam física detectada
+    print("[Câmera] AVISO: Nenhuma webcam física ativa detectada.")
+    try:
+        import ctypes
+        MB_YESNO = 0x00000004
+        MB_ICONQUESTION = 0x00000020
+        IDYES = 6
+        resp = ctypes.windll.user32.MessageBoxW(
+            0,
+            "Nenhuma webcam foi detectada neste computador.\n\n"
+            "O AlfaIA necessita de uma câmera para reconhecer a escrita no ar com a mão.\n\n"
+            "Deseja iniciar mesmo assim no MODO DEMONSTRAÇÃO?\n"
+            "(Permite navegar por todos os menus e desenhar na tela usando o MOUSE)",
+            "AlfaIA — Câmera não encontrada",
+            MB_YESNO | MB_ICONQUESTION,
+        )
+        if resp == IDYES:
+            print("[Câmera] Usuário escolheu iniciar em Modo Demonstração (Mouse).")
+            return CameraMock(largura, altura), True
+    except Exception as e:
+        print(f"[Câmera] Erro ao exibir popup: {e}")
+
+    return None, False
 
 # ─── Configurações gerais ─────────────────────────────────────────────────────
 CAMERA_INDEX  = 0
@@ -521,7 +654,7 @@ def executar_exercicio(
       'menu' → voltar ao menu principal
       'sair' → fechar o programa
     """
-    cam    = Camera(CAMERA_INDEX, FRAME_WIDTH, FRAME_HEIGHT, mao_desenho)
+    cam    = Camera(CAMERA_INDEX, FRAME_WIDTH, FRAME_HEIGHT, mao_desenho, cap=cap)
     canvas = Canvas(FRAME_WIDTH, FRAME_HEIGHT, COR_INICIAL, ESP_INICIAL)
 
     cor_pincel     = COR_INICIAL
@@ -552,11 +685,16 @@ def executar_exercicio(
     tipo_feedback = "sucesso"
 
     # Mouse listener
-    mouse_exer = {"pos": None, "clique": None}
+    mouse_exer = {"pos": None, "clique": None, "desenhando": False, "ultimo_pt": None}
     def _on_mouse(ev, x, y, flags, param):
         mouse_exer["pos"] = (x, y)
         if ev == cv2.EVENT_LBUTTONDOWN:
             mouse_exer["clique"] = (x, y)
+            mouse_exer["desenhando"] = True
+            mouse_exer["ultimo_pt"] = (x, y)
+        elif ev == cv2.EVENT_LBUTTONUP:
+            mouse_exer["desenhando"] = False
+            mouse_exer["ultimo_pt"] = None
     cv2.setMouseCallback(WINDOW_NAME, _on_mouse)
 
     if gerador:
@@ -605,6 +743,20 @@ def executar_exercicio(
                 em_hover_menu = False
         else:
             em_hover_menu = False
+
+        # ── Suporte a desenho com mouse (Modo Demonstração / Teste) ────────
+        if estado == ST_ESCREVENDO and mouse_exer["desenhando"] and mouse_exer["pos"]:
+            mx, my = mouse_exer["pos"]
+            if not (BTN_MENU_X1 <= mx <= BTN_MENU_X2 and BTN_MENU_Y1 <= my <= BTN_MENU_Y2) and my > ALTURA_PALETA:
+                if borracha_ativa:
+                    canvas.apagar_circulo((mx, my), RAIO_BORRACHA)
+                else:
+                    ult = mouse_exer["ultimo_pt"]
+                    if ult and ult != (mx, my):
+                        canvas.desenhar_linha(ult, (mx, my), cor_pincel, espessura)
+                    else:
+                        canvas.desenhar_ponto((mx, my), cor_pincel, espessura)
+                    mouse_exer["ultimo_pt"] = (mx, my)
 
         if estado == ST_ESCREVENDO:
 
@@ -735,6 +887,8 @@ def executar_exercicio(
         elif k in (ord('q'), ord('Q')):    # Q: fechar o programa
             resultado = "sair"
             break
+        elif k in (13, 10) and estado == ST_ESCREVENDO:  # ENTER: confirma a escrita
+            estado = ST_ANALISANDO
         elif k == ord(' '):               # ESPAÇO: próxima questão / limpar
             canvas.limpar()
             borracha_ativa = False
@@ -757,60 +911,79 @@ def executar_exercicio(
 # ══════════════════════════════════════════════════════════════════════════════
 
 def main():
-    cap = cv2.VideoCapture(CAMERA_INDEX)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH,  FRAME_WIDTH)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
-    if not cap.isOpened():
-        print("[ERRO] Não foi possível abrir a câmera.")
-        return
+    setup_logging()
+    print("[TCC SENAI 2026] Iniciando aplicativo...")
 
-    # Módulos compartilhados (inicializados uma única vez)
-    ocr      = OCRReader()
-    feedback = FeedbackEngine()
-    voz      = VoiceSpeaker()
+    try:
+        cap, eh_simulado = conectar_camera(FRAME_WIDTH, FRAME_HEIGHT)
+        if cap is None:
+            print("[TCC SENAI 2026] Encerrado: nenhuma câmera disponível.")
+            return
 
-    print("[TCC SENAI 2026] Sistema iniciado com sucesso.")
+        # Módulos compartilhados (inicializados uma única vez)
+        ocr      = OCRReader()
+        feedback = FeedbackEngine()
+        voz      = VoiceSpeaker()
 
-    sair_total = False
-    while not sair_total:
+        print("[TCC SENAI 2026] Sistema iniciado com sucesso.")
 
-        # ── Tela 1: Boas-vindas ───────────────────────────────────────────────
-        materia = tela_boas_vindas(cap)
-        if materia is None:
-            # Pressionou Q ou ESC na tela inicial: encerra
-            break
+        sair_total = False
+        while not sair_total:
 
-        if materia == "portugues":
-            lat = tela_lateralidade(cap)
-            if lat is None:
-                continue  # volta ao menu de boas-vindas
+            # ── Tela 1: Boas-vindas ───────────────────────────────────────────────
+            materia = tela_boas_vindas(cap)
+            if materia is None:
+                # Pressionou Q ou ESC na tela inicial: encerra
+                break
 
-            mao = "direita" if lat == "destro" else "esquerda"
-            ret = executar_exercicio(cap, mao, "portugues",
-                                     feedback_engine=feedback, ocr=ocr, voz=voz)
-            if ret == "sair":
-                sair_total = True
+            if materia == "portugues":
+                lat = tela_lateralidade(cap)
+                if lat is None:
+                    continue  # volta ao menu de boas-vindas
 
-        elif materia == "matematica":
-            tipo_op = tela_menu_matematica(cap)
-            if tipo_op is None:
-                continue  # volta ao menu de boas-vindas
+                mao = "direita" if lat == "destro" else "esquerda"
+                ret = executar_exercicio(cap, mao, "portugues",
+                                         feedback_engine=feedback, ocr=ocr, voz=voz)
+                if ret == "sair":
+                    sair_total = True
 
-            lat = tela_lateralidade(cap)
-            if lat is None:
-                continue  # volta ao menu
+            elif materia == "matematica":
+                tipo_op = tela_menu_matematica(cap)
+                if tipo_op is None:
+                    continue  # volta ao menu de boas-vindas
 
-            mao = "direita" if lat == "destro" else "esquerda"
-            gerador = GeradorProblema(tipo_op)
-            ret = executar_exercicio(cap, mao, tipo_op,
-                                     gerador=gerador, ocr=ocr, voz=voz)
-            if ret == "sair":
-                sair_total = True
+                lat = tela_lateralidade(cap)
+                if lat is None:
+                    continue  # volta ao menu
 
-    voz.parar()
-    cap.release()
-    cv2.destroyAllWindows()
-    print("[TCC SENAI 2026] Encerrado.")
+                mao = "direita" if lat == "destro" else "esquerda"
+                gerador = GeradorProblema(tipo_op)
+                ret = executar_exercicio(cap, mao, tipo_op,
+                                         gerador=gerador, ocr=ocr, voz=voz)
+                if ret == "sair":
+                    sair_total = True
+
+        voz.parar()
+        if hasattr(cap, "release"):
+            cap.release()
+        cv2.destroyAllWindows()
+        print("[TCC SENAI 2026] Encerrado normalmente.")
+
+    except Exception as e:
+        import traceback
+        err_msg = traceback.format_exc()
+        print(f"[ERRO CRÍTICO] {err_msg}")
+        try:
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(
+                0,
+                f"Ocorreu um erro inesperado ao executar o AlfaIA:\n\n{e}\n\n"
+                f"O relatório completo foi salvo no arquivo 'alfaia_debug.log'.",
+                "AlfaIA — Erro Crítico",
+                0x00000010, # MB_ICONERROR
+            )
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

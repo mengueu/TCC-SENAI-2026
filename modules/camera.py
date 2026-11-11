@@ -147,10 +147,17 @@ class Camera:
         largura: int = 1280,
         altura: int = 720,
         mao_desenho: str = "direita",
+        cap: cv2.VideoCapture | None = None,
     ):
-        self.cap = cv2.VideoCapture(indice)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, largura)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, altura)
+        if cap is not None:
+            self.cap = cap
+            self._gerencia_cap = False
+        else:
+            self.cap = cv2.VideoCapture(indice, cv2.CAP_DSHOW)
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, largura)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, altura)
+            self._gerencia_cap = True
+
         self.largura    = largura
         self.altura     = altura
         self.mao_desenho = mao_desenho
@@ -176,9 +183,13 @@ class Camera:
 
         self._frames_sem_mao = FRAMES_TOLERANCIA_PERDA + 1
 
-    def ler_frame(self) -> np.ndarray | None:
+    def ler_frame(self) -> np.ndarray:
+        if self.cap is None:
+            return np.zeros((self.altura, self.largura, 3), np.uint8)
         ok, frame = self.cap.read()
-        return cv2.flip(frame, 1) if ok else None
+        if ok and frame is not None:
+            return cv2.flip(frame, 1)
+        return np.zeros((self.altura, self.largura, 3), np.uint8)
 
     def processar_frame(self, frame: np.ndarray) -> tuple[np.ndarray, dict]:
         """
@@ -274,5 +285,7 @@ class Camera:
         }
 
     def encerrar(self):
-        self.cap.release()
-        self.hands.close()
+        if getattr(self, "_gerencia_cap", True) and hasattr(self.cap, "release"):
+            self.cap.release()
+        if hasattr(self, "hands") and self.hands:
+            self.hands.close()
