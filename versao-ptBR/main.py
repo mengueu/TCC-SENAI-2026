@@ -1,11 +1,13 @@
 """
-TCC SENAI 2026 — Ferramenta de Alfabetização com Visão Computacional
+TraçAÍ Educação — Ferramenta de Alfabetização com Visão Computacional
 
 Grupo 8: Miguel Augusto Rocha, Ana Luiza Ferreira Antônio,
          Maria Luiza Aguilar e Pedro Antunes.
+TCC — Curso Técnico de Desenvolvimento de Sistemas | SENAI 2026
 
 Fluxo de telas:
-  1. Boas-vindas          → escolhe matéria
+  0. Splash / Boas-vindas → recomenda Guia do Usuário
+  1. Menu principal       → escolhe matéria
   2a. Língua Portuguesa   → lateralidade → exercício de nome
   2b. Matemática          → menu da operação → lateralidade → exercício de conta
 
@@ -55,7 +57,7 @@ def setup_logging():
             base_dir = Path(sys.executable).resolve().parent
         else:
             base_dir = Path(__file__).resolve().parent
-        log_path = base_dir / "alfaia_debug.log"
+        log_path = base_dir / "tracaai_debug.log"
 
         file_handler = logging.FileHandler(str(log_path), mode="w", encoding="utf-8")
         file_handler.setLevel(logging.INFO)
@@ -96,7 +98,7 @@ def setup_logging():
 
         sys.stdout = LogStream(logging.info, sys.stdout, file_handler)
         sys.stderr = LogStream(logging.error, sys.stderr, file_handler)
-        logging.info("Sistema de logs AlfaIA inicializado com sucesso.")
+        logging.info("Sistema de logs TraçAÍ Educação inicializado com sucesso.")
         file_handler.flush()
     except Exception:
         pass
@@ -162,10 +164,10 @@ def conectar_camera(largura: int = 1280, altura: int = 720) -> tuple[cv2.VideoCa
         resp = ctypes.windll.user32.MessageBoxW(
             0,
             "Nenhuma webcam foi detectada neste computador.\n\n"
-            "O AlfaIA necessita de uma câmera para reconhecer a escrita no ar com a mão.\n\n"
+            "O TraçAÍ Educação necessita de uma câmera para reconhecer a escrita no ar com a mão.\n\n"
             "Deseja iniciar mesmo assim no MODO DEMONSTRAÇÃO?\n"
             "(Permite navegar por todos os menus e desenhar na tela usando o MOUSE)",
-            "AlfaIA — Câmera não encontrada",
+            "TraçAÍ Educação — Câmera não encontrada",
             MB_YESNO | MB_ICONQUESTION,
         )
         if resp == IDYES:
@@ -180,7 +182,62 @@ def conectar_camera(largura: int = 1280, altura: int = 720) -> tuple[cv2.VideoCa
 CAMERA_INDEX  = 0
 FRAME_WIDTH   = 1280
 FRAME_HEIGHT  = 720
-WINDOW_NAME   = "TCC SENAI 2026"
+WINDOW_NAME    = "TraçAÍ Educação"
+APP_VERSION    = "1.0.0"
+
+
+def _set_window_title(title: str):
+    """Define o título da janela Win32 com Unicode correto (corrige encoding cv2)."""
+    try:
+        import ctypes
+        # O cv2 pode ter corrompido o título; tenta encontrar por candidatos
+        candidates = [title, WINDOW_NAME, "TraAI Educao", "TracaAI"]
+        for c in candidates:
+            hwnd = ctypes.windll.user32.FindWindowW(None, c)
+            if hwnd:
+                ctypes.windll.user32.SetWindowTextW(hwnd, title)
+                break
+        # Fallback: enumera janelas pelo processo atual
+        if not any(ctypes.windll.user32.FindWindowW(None, c) for c in candidates):
+            import os
+            pid = os.getpid()
+            found = []
+            EnumWindows = ctypes.windll.user32.EnumWindows
+            EnumWindowsProc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int))
+            GetWindowThreadProcessId = ctypes.windll.user32.GetWindowThreadProcessId
+            def callback(hwnd, _):
+                pid2 = ctypes.c_ulong()
+                GetWindowThreadProcessId(hwnd, ctypes.byref(pid2))
+                if pid2.value == pid:
+                    found.append(hwnd)
+                return True
+            EnumWindows(EnumWindowsProc(callback), 0)
+            for hwnd in found:
+                ctypes.windll.user32.SetWindowTextW(hwnd, title)
+    except Exception:
+        pass
+
+
+def _get_window_size() -> tuple[int, int]:
+    """Retorna (largura, altura) atual da janela OpenCV (suporte a tela cheia)."""
+    try:
+        rect = cv2.getWindowImageRect(WINDOW_NAME)
+        if rect and len(rect) == 4 and rect[2] > 0 and rect[3] > 0:
+            return rect[2], rect[3]
+    except Exception:
+        pass
+    return FRAME_WIDTH, FRAME_HEIGHT
+
+
+def _fit_frame(frame: np.ndarray) -> np.ndarray:
+    """Escala o frame para preencher a janela atual (funciona em tela cheia)."""
+    win_w, win_h = _get_window_size()
+    fh, fw = frame.shape[:2]
+    if fw == win_w and fh == win_h:
+        return frame
+    if win_w <= 0 or win_h <= 0:
+        return frame
+    return cv2.resize(frame, (win_w, win_h), interpolation=cv2.INTER_LINEAR)
 
 COR_INICIAL  = (255, 140, 0)
 ESP_INICIAL  = 12
@@ -213,6 +270,243 @@ C_CINZA  = (160, 160, 160)
 C_LARANJA= (60,  140, 255)
 C_AZUL   = (200, 100,  40)
 C_ROXO   = (200,  60, 180)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LOGO — carregada uma vez na inicialização
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _carregar_logo(altura_px: int = 80) -> np.ndarray | None:
+    """Carrega a logo do projeto e redimensiona para a altura desejada."""
+    try:
+        from modules.caminhos import obter_caminho_recurso
+        logo_path = obter_caminho_recurso("assets/logo.png")
+        if not logo_path.exists():
+            return None
+        logo = cv2.imread(str(logo_path), cv2.IMREAD_UNCHANGED)
+        if logo is None:
+            return None
+        h, w = logo.shape[:2]
+        nova_w = int(w * altura_px / h)
+        logo = cv2.resize(logo, (nova_w, altura_px), interpolation=cv2.INTER_AREA)
+        return logo
+    except Exception as e:
+        print(f"[Logo] Erro ao carregar: {e}")
+        return None
+
+
+def _desenhar_logo(frame: np.ndarray, logo: np.ndarray | None, x: int, y: int) -> np.ndarray:
+    """Desenha a logo com suporte a canal alpha (transparência) sobre o frame."""
+    if logo is None:
+        return frame
+    try:
+        lh, lw = logo.shape[:2]
+        # Recorta se sair da tela
+        y1, y2 = max(0, y), min(frame.shape[0], y + lh)
+        x1, x2 = max(0, x), min(frame.shape[1], x + lw)
+        if y1 >= y2 or x1 >= x2:
+            return frame
+        roi = frame[y1:y2, x1:x2]
+        logo_crop = logo[0:(y2-y1), 0:(x2-x1)]
+        if logo.shape[2] == 4:
+            alpha = logo_crop[:, :, 3:4].astype(np.float32) / 255.0
+            rgb   = logo_crop[:, :, :3].astype(np.float32)
+            roi_f = roi.astype(np.float32)
+            blended = (rgb * alpha + roi_f * (1 - alpha)).clip(0, 255).astype(np.uint8)
+            frame[y1:y2, x1:x2] = blended
+        else:
+            frame[y1:y2, x1:x2] = logo_crop[:, :, :3]
+    except Exception as e:
+        print(f"[Logo] Erro ao desenhar: {e}")
+    return frame
+
+
+# Logo global (carregada uma única vez)
+_LOGO_PRINCIPAL: np.ndarray | None = None
+_LOGO_PEQUENA:   np.ndarray | None = None
+
+
+def inicializar_logo():
+    """Carrega a logo em dois tamanhos usados nas telas."""
+    global _LOGO_PRINCIPAL, _LOGO_PEQUENA
+    _LOGO_PRINCIPAL = _carregar_logo(altura_px=120)
+    _LOGO_PEQUENA   = _carregar_logo(altura_px=52)
+    print(f"[Logo] Carregada: principal={_LOGO_PRINCIPAL is not None}, pequena={_LOGO_PEQUENA is not None}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPLASH SCREEN — tela de boas-vindas com logo
+# ══════════════════════════════════════════════════════════════════════════════
+
+def tela_splash(cap) -> bool:
+    """
+    Tela de boas-vindas com visual moderno: fundo escuro sólido, logo centralizada,
+    nome do app, caixa de aviso do Guia do Usuário e botão COMEÇAR.
+    Suporta tela cheia — o conteúdo escala com a janela.
+    Retorna True para continuar, False para sair.
+    """
+    mouse = {"pos": None, "clique": None}
+
+    def _mouse_cb(ev, x, y, f, p):
+        mouse["pos"] = (x, y)
+        if ev == cv2.EVENT_LBUTTONDOWN:
+            mouse["clique"] = (x, y)
+
+    cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(WINDOW_NAME, FRAME_WIDTH, FRAME_HEIGHT)
+    cv2.setMouseCallback(WINDOW_NAME, _mouse_cb)
+
+    # Corrige o título da barra (encoding UTF-8)
+    import time as _time
+    _time.sleep(0.05)
+    _set_window_title(WINDOW_NAME)
+
+    # Cores do design
+    COR_BG        = (18, 18, 32)       # fundo escuro azulado
+    COR_ACENTO    = (255, 200, 0)      # dourado/âmbar
+    COR_BRANCO    = (240, 240, 240)
+    COR_CINZA_CLR = (160, 160, 170)
+    COR_VERDE_BTN = (40, 180, 80)
+    COR_AVISO_BG  = (28, 60, 100)
+    COR_AVISO_BRD = (80, 160, 230)
+    COR_BTN_HOV   = (60, 200, 100)
+
+    while True:
+        # ── Base: câmera com overlay escuro ou fundo sólido ───────────────────
+        ok, raw = cap.read()
+        win_w, win_h = _get_window_size()
+        if win_w <= 0: win_w = FRAME_WIDTH
+        if win_h <= 0: win_h = FRAME_HEIGHT
+
+        if ok and raw is not None and raw.size > 0:
+            # Câmera disponível: usa como fundo com overlay forte
+            bg = cv2.flip(raw, 1)
+            bg = cv2.resize(bg, (win_w, win_h))
+            # Suaviza e escurece muito para ficar elegante
+            bg = cv2.GaussianBlur(bg, (21, 21), 0)
+            overlay = np.full_like(bg, COR_BG)
+            frame = cv2.addWeighted(bg, 0.18, overlay, 0.82, 0)
+        else:
+            frame = np.full((win_h, win_w, 3), COR_BG, dtype=np.uint8)
+
+        h, w = frame.shape[:2]
+        cx = w // 2  # centro horizontal
+
+        # ── Faixa de gradiente no topo ────────────────────────────────────────
+        topo_h = int(h * 0.18)
+        for i in range(topo_h):
+            al = 1.0 - (i / topo_h)
+            cor = tuple(int(COR_BG[c] * (1 - al * 0.5) + (0, 10, 40)[c] * al * 0.5) for c in range(3))
+            cv2.line(frame, (0, i), (w, i), cor, 1)
+
+        # ── Linha decorativa ─────────────────────────────────────────────────
+        line_y = int(h * 0.12)
+        cv2.line(frame, (cx - 180, line_y), (cx + 180, line_y), COR_ACENTO, 2)
+
+        # ── Logo centrada ─────────────────────────────────────────────────────
+        logo_h_px = max(80, int(h * 0.18))
+        logo = _carregar_logo(logo_h_px)
+        logo_top = int(h * 0.15)
+        if logo is not None:
+            lw_px = logo.shape[1]
+            frame = _desenhar_logo(frame, logo, cx - lw_px // 2, logo_top)
+            nome_y = logo_top + logo_h_px + int(h * 0.03)
+        else:
+            nome_y = int(h * 0.35)
+
+        # ── Nome do aplicativo ────────────────────────────────────────────────
+        tam_nome = max(28, int(h * 0.075))
+        nome_txt = "TraçAÍ Educação"
+        nw, nh = medir(nome_txt, tam_nome)
+        frame = escrever(frame, nome_txt, (cx - nw // 2, nome_y), tam_nome, COR_ACENTO, negrito=True)
+
+        # Sublinhado dourado decorativo
+        sub_y = nome_y + nh + 4
+        cv2.line(frame, (cx - nw // 2, sub_y), (cx + nw // 2, sub_y), COR_ACENTO, 2)
+
+        # Slogan
+        tam_slogan = max(14, int(h * 0.032))
+        slogan = "Aprenda escrevendo com a sua própria mão!"
+        sw, _ = medir(slogan, tam_slogan)
+        frame = escrever(frame, slogan, (cx - sw // 2, sub_y + int(h * 0.025)),
+                         tam_slogan, COR_BRANCO)
+
+        # ── Caixa de aviso: Guia do Usuário ──────────────────────────────────
+        box_w   = min(680, int(w * 0.65))
+        box_h   = int(h * 0.18)
+        box_x1  = cx - box_w // 2
+        box_y1  = int(h * 0.60)
+        box_x2  = box_x1 + box_w
+        box_y2  = box_y1 + box_h
+
+        # Fundo semitransparente da caixa
+        box_bg = frame[box_y1:box_y2, box_x1:box_x2].copy()
+        box_fill = np.full_like(box_bg, COR_AVISO_BG)
+        frame[box_y1:box_y2, box_x1:box_x2] = cv2.addWeighted(box_bg, 0.25, box_fill, 0.75, 0)
+        cv2.rectangle(frame, (box_x1, box_y1), (box_x2, box_y2), COR_AVISO_BRD, 2)
+
+        tam_av  = max(13, int(h * 0.028))
+        tam_av2 = max(11, int(h * 0.023))
+
+        av1 = "📖  Primeira vez usando o TraçAÍ?"
+        a1w, _ = medir(av1, tam_av)
+        frame = escrever(frame, av1, (cx - a1w // 2, box_y1 + int(box_h * 0.18)),
+                         tam_av, COR_ACENTO, negrito=True)
+
+        av2 = "Leia o Guia do Usuário antes de começar!"
+        a2w, _ = medir(av2, tam_av)
+        frame = escrever(frame, av2, (cx - a2w // 2, box_y1 + int(box_h * 0.48)),
+                         tam_av, COR_BRANCO)
+
+        av3 = "(Arquivo 'Guia_do_Usuario.pdf' disponível na mesma pasta do programa)"
+        a3w, _ = medir(av3, tam_av2)
+        frame = escrever(frame, av3, (cx - a3w // 2, box_y1 + int(box_h * 0.74)),
+                         tam_av2, COR_CINZA_CLR)
+
+        # ── Botão COMEÇAR ─────────────────────────────────────────────────────
+        btn_w   = min(320, int(w * 0.28))
+        btn_h   = max(50, int(h * 0.085))
+        btn_x1  = cx - btn_w // 2
+        btn_y1  = box_y2 + int(h * 0.04)
+        btn_x2  = btn_x1 + btn_w
+        btn_y2  = btn_y1 + btn_h
+
+        hov = _dentro(mouse["pos"], (btn_x1, btn_y1), (btn_x2, btn_y2))
+        cor_btn_atual = COR_BTN_HOV if hov else COR_VERDE_BTN
+
+        # Sombra suave
+        cv2.rectangle(frame, (btn_x1 + 3, btn_y1 + 4), (btn_x2 + 3, btn_y2 + 4), (0, 60, 20), -1)
+        # Botão
+        cv2.rectangle(frame, (btn_x1, btn_y1), (btn_x2, btn_y2), cor_btn_atual, -1)
+        cv2.rectangle(frame, (btn_x1, btn_y1), (btn_x2, btn_y2), COR_BRANCO if hov else cor_btn_atual, 2)
+
+        tam_btn = max(16, int(h * 0.038))
+        btn_txt = "COMEÇAR!"
+        btw, bth = medir(btn_txt, tam_btn)
+        frame = escrever(frame, btn_txt,
+                         (cx - btw // 2, (btn_y1 + btn_y2) // 2 - bth // 2),
+                         tam_btn, (255, 255, 255), negrito=True)
+
+        # ── Rodapé ────────────────────────────────────────────────────────────
+        tam_rod = max(10, int(h * 0.022))
+        rod = f"v{APP_VERSION}  |  Grupo 8 — SENAI 2026  |  ESC ou Q = Sair  |  ENTER = Começar"
+        rw, _ = medir(rod, tam_rod)
+        frame = escrever(frame, rod, (cx - rw // 2, h - int(h * 0.04)),
+                         tam_rod, COR_CINZA_CLR)
+
+        cv2.imshow(WINDOW_NAME, frame)
+
+        # Clique no botão
+        if mouse["clique"]:
+            cl = mouse["clique"]; mouse["clique"] = None
+            if _dentro(cl, (btn_x1, btn_y1), (btn_x2, btn_y2)):
+                return True
+
+        k = cv2.waitKey(1) & 0xFF
+        if k in (ord('q'), ord('Q'), 27):
+            return False
+        if k in (13, ord(' ')):
+            return True
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -279,7 +573,7 @@ def tela_boas_vindas(cap: cv2.VideoCapture) -> str | None:
         if ev == cv2.EVENT_LBUTTONDOWN:
             mouse["clique"] = (x, y)
 
-    cv2.namedWindow(WINDOW_NAME)
+    cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
     cv2.setMouseCallback(WINDOW_NAME, _mouse)
 
     while True:
@@ -288,26 +582,33 @@ def tela_boas_vindas(cap: cv2.VideoCapture) -> str | None:
             frame = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
         else:
             frame = cv2.flip(frame, 1)
+        frame = _fit_frame(frame)
         h, w = frame.shape[:2]
         frame = _overlay(frame, 0.70)
 
         # ── Título ────────────────────────────────────────────────────────────
-        titulo  = "Seja bem-vindo!"
-        subtit  = "Projeto de TCC — SENAI 2026"
+        # Logo pequena à esquerda do título
+        logo_topo_y = h // 2 - 250
+        if _LOGO_PEQUENA is not None:
+            lw_sm = _LOGO_PEQUENA.shape[1]
+            frame = _desenhar_logo(frame, _LOGO_PEQUENA, w // 2 - lw_sm // 2, logo_topo_y)
+
+        titulo  = "TraçAÍ Educação"
+        subtit  = "TCC — SENAI 2026  |  Grupo 8"
         instruc = "Escolha qual exercício deseja trabalhar:"
 
-        tw, _ = medir(titulo, 70)
-        frame = escrever(frame, titulo,  (w//2 - tw//2, h//2 - 230), 70, C_AMARELO, negrito=True)
+        tw, _ = medir(titulo, 60)
+        frame = escrever(frame, titulo,  (w//2 - tw//2, h//2 - 170), 60, C_AMARELO, negrito=True)
 
-        sw, _ = medir(subtit, 26)
-        frame = escrever(frame, subtit,  (w//2 - sw//2, h//2 - 155), 26, C_CINZA)
+        sw, _ = medir(subtit, 24)
+        frame = escrever(frame, subtit,  (w//2 - sw//2, h//2 - 105), 24, C_CINZA)
 
         iw, _ = medir(instruc, 30)
-        frame = escrever(frame, instruc, (w//2 - iw//2, h//2 -  95), 30, C_BRANCO)
+        frame = escrever(frame, instruc, (w//2 - iw//2, h//2 -  58), 30, C_BRANCO)
 
         # ── Botões ────────────────────────────────────────────────────────────
-        mat_p1 = (w//2 - 380, h//2 - 55); mat_p2 = (w//2 - 20, h//2 + 90)
-        por_p1 = (w//2 +  20, h//2 - 55); por_p2 = (w//2 + 380, h//2 + 90)
+        mat_p1 = (w//2 - 380, h//2 - 20); mat_p2 = (w//2 - 20, h//2 + 125)
+        por_p1 = (w//2 +  20, h//2 - 20); por_p2 = (w//2 + 380, h//2 + 125)
 
         hm = _dentro(mouse["pos"], mat_p1, mat_p2)
         hp = _dentro(mouse["pos"], por_p1, por_p2)
@@ -366,6 +667,7 @@ def tela_menu_matematica(cap: cv2.VideoCapture) -> str | None:
             frame = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
         else:
             frame = cv2.flip(frame, 1)
+        frame = _fit_frame(frame)
         h, w = frame.shape[:2]
         frame = _overlay(frame, 0.72)
 
@@ -441,6 +743,7 @@ def tela_lateralidade(cap: cv2.VideoCapture) -> str | None:
             frame = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), np.uint8)
         else:
             frame = cv2.flip(frame, 1)
+        frame = _fit_frame(frame)
         h, w = frame.shape[:2]
         frame = _overlay(frame, 0.65)
 
@@ -912,12 +1215,24 @@ def executar_exercicio(
 
 def main():
     setup_logging()
-    print("[TCC SENAI 2026] Iniciando aplicativo...")
+    print("[TraçAÍ Educação] Iniciando aplicativo...")
 
     try:
         cap, eh_simulado = conectar_camera(FRAME_WIDTH, FRAME_HEIGHT)
         if cap is None:
-            print("[TCC SENAI 2026] Encerrado: nenhuma câmera disponível.")
+            print("[TraçAÍ Educação] Encerrado: nenhuma câmera disponível.")
+            return
+
+        # Carrega a logo antes de qualquer tela
+        inicializar_logo()
+
+        # ── Splash / Boas-vindas ───────────────────────────────────────────────
+        continuar = tela_splash(cap)
+        if not continuar:
+            print("[TraçAÍ Educação] Usuário saiu na tela de boas-vindas.")
+            if hasattr(cap, "release"):
+                cap.release()
+            cv2.destroyAllWindows()
             return
 
         # Módulos compartilhados (inicializados uma única vez)
@@ -925,21 +1240,20 @@ def main():
         feedback = FeedbackEngine()
         voz      = VoiceSpeaker()
 
-        print("[TCC SENAI 2026] Sistema iniciado com sucesso.")
+        print("[TraçAÍ Educação] Sistema iniciado com sucesso.")
 
         sair_total = False
         while not sair_total:
 
-            # ── Tela 1: Boas-vindas ───────────────────────────────────────────────
+            # ── Tela 1: Menu principal ────────────────────────────────────────────
             materia = tela_boas_vindas(cap)
             if materia is None:
-                # Pressionou Q ou ESC na tela inicial: encerra
                 break
 
             if materia == "portugues":
                 lat = tela_lateralidade(cap)
                 if lat is None:
-                    continue  # volta ao menu de boas-vindas
+                    continue
 
                 mao = "direita" if lat == "destro" else "esquerda"
                 ret = executar_exercicio(cap, mao, "portugues",
@@ -950,11 +1264,11 @@ def main():
             elif materia == "matematica":
                 tipo_op = tela_menu_matematica(cap)
                 if tipo_op is None:
-                    continue  # volta ao menu de boas-vindas
+                    continue
 
                 lat = tela_lateralidade(cap)
                 if lat is None:
-                    continue  # volta ao menu
+                    continue
 
                 mao = "direita" if lat == "destro" else "esquerda"
                 gerador = GeradorProblema(tipo_op)
@@ -967,7 +1281,7 @@ def main():
         if hasattr(cap, "release"):
             cap.release()
         cv2.destroyAllWindows()
-        print("[TCC SENAI 2026] Encerrado normalmente.")
+        print("[TraçAÍ Educação] Encerrado normalmente.")
 
     except Exception as e:
         import traceback
@@ -977,10 +1291,10 @@ def main():
             import ctypes
             ctypes.windll.user32.MessageBoxW(
                 0,
-                f"Ocorreu um erro inesperado ao executar o AlfaIA:\n\n{e}\n\n"
-                f"O relatório completo foi salvo no arquivo 'alfaia_debug.log'.",
-                "AlfaIA — Erro Crítico",
-                0x00000010, # MB_ICONERROR
+                f"Ocorreu um erro inesperado ao executar o TraçAÍ Educação:\n\n{e}\n\n"
+                f"O relatório completo foi salvo no arquivo 'tracaai_debug.log'.",
+                "TraçAÍ Educação — Erro Crítico",
+                0x00000010,
             )
         except Exception:
             pass

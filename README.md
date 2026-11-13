@@ -1,149 +1,91 @@
-# 📚 AlfaIA — Ferramenta de Alfabetização com Visão Computacional
+# TraçAÍ Educação — TCC SENAI 2026
 
-> **TCC do Curso Técnico de Desenvolvimento de Sistemas — SENAI 2026**  
-> Evolução do projeto da Semana Aberta: de um quadro de desenho livre para uma ferramenta educacional de alfabetização infantil.
+<p align="center">
+  <img src="versao-ptBR/assets/logo.png" alt="Logo TraçAÍ Educação" width="160"/>
+</p>
 
----
+<p align="center">
+  <strong>Ferramenta de Alfabetização e Matemática com Visão Computacional</strong><br/>
+  TCC — Curso Técnico de Desenvolvimento de Sistemas | SENAI 2026
+</p>
 
-## 🧠 O que é o AlfaIA?
-
-O **AlfaIA** é uma ferramenta educacional interativa voltada para crianças em processo de alfabetização. Usando a câmera do computador, a criança **escreve com o próprio dedo no ar** — sem precisar de mouse, teclado, caneta ou tablet — e a IA lê o que foi escrito, interpreta e devolve um **feedback personalizado** na tela.
-
-A ideia não é um jogo, mas uma **ferramenta de prática**: como um caderno mágico onde a criança pratica escrita, leitura e, futuramente, matemática, de forma lúdica e sem custos.
-
----
-
-## 🎯 Por que evoluir o projeto da Semana Aberta?
-
-O projeto anterior mostrou que é possível capturar gestos e movimentos das mãos com precisão usando tecnologia acessível (câmera comum + Python). A evolução natural é **dar propósito pedagógico** a isso:
-
-| Projeto anterior | TCC (AlfaIA) |
-|---|---|
-| Quadro de desenho livre | Ferramenta de prática educacional |
-| Feedback visual apenas (traço na tela) | Feedback da IA (lê, interpreta, responde) |
-| Qualquer público | Crianças em alfabetização |
-| Sem objetivo pedagógico | Prática de escrita, leitura e matemática |
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11-blue?logo=python" />
+  <img src="https://img.shields.io/badge/OpenCV-4.x-green?logo=opencv" />
+  <img src="https://img.shields.io/badge/MediaPipe-0.10-orange" />
+  <img src="https://img.shields.io/badge/Status-Em%20desenvolvimento-yellow" />
+</p>
 
 ---
 
-## ✨ Funcionalidades (Módulo 1 — Nome)
+## Sobre o Projeto
 
-> Esta é a primeira funcionalidade implementada. Outras virão em versões futuras.
+O **TraçAÍ Educação** é uma aplicação desktop que usa visão computacional para auxiliar crianças em processo de alfabetização. O aluno escreve letras e números **no ar com a própria mão** na frente da webcam, e uma IA analisa o que foi escrito em tempo real, fornecendo feedback imediato.
 
-1. **Pergunta**: A tela exibe *"Qual o seu nome?"*
-2. **Escrita**: A criança usa o dedo indicador para escrever o nome no ar
-3. **Confirmação**: Um gesto (ex: mão aberta) finaliza a escrita e envia para análise
-4. **Análise**: O Tesseract OCR lê a imagem do canvas; um algoritmo de similaridade compara com nomes comuns
-5. **Feedback**: A IA responde com uma mensagem personalizada na tela:
-   - ✅ Escrita correta: *"Olá, Miguel! Parabéns, você escreveu seu nome direitinho! 🎉"*
-   - 🔄 Escrita parecida: *"Você quis dizer que seu nome é Miguel? Tente a letra 'M' com mais calma!"*
-   - ❓ Não reconhecido: *"Hmm, não consegui ler bem. Tente escrever mais devagar, letra por letra!"*
+**Grupo 8:**  
+Miguel Augusto Rocha · Ana Luiza Ferreira Antônio · Maria Luiza Aguilar · Pedro Antunes
 
 ---
 
-## 🔭 Funcionalidades Futuras (Roadmap)
+## Estrutura do Repositório
 
-- [ ] **Módulo de Leitura**: A tela mostra uma palavra e a criança a copia por escrito
-- [ ] **Módulo de Matemática**: Operações simples (ex: "Quanto é 2 + 3?" → criança escreve "5")
-- [ ] **Perfil de progresso**: Salva o histórico da criança e mostra evolução
-- [ ] **Modo daltônico / acessível**
-- [ ] **Suporte a múltiplas línguas**
-
----
-
-## 🛠️ Tecnologias e Ferramentas
-
-| Ferramenta | Papel no projeto | Custo |
-|---|---|---|
-| **Python 3.10–3.12** | Linguagem principal | Gratuito |
-| **OpenCV** | Captura da câmera, desenho na tela, processamento de imagem | Gratuito |
-| **MediaPipe** | Detecção da mão e dos 21 pontos (landmarks) dos dedos | Gratuito |
-| **NumPy** | Manipulação do canvas como matriz | Gratuito |
-| **Tesseract OCR** | Lê o texto escrito pela criança (reconhecimento óptico de caracteres) | Gratuito |
-| **pytesseract** | Wrapper Python para usar o Tesseract | Gratuito |
-| **python-Levenshtein** | Mede a distância entre palavras (ex: "Migel" → "Miguel") | Gratuito |
-| **pyttsx3** | Síntese de voz — fala o feedback para a criança | Gratuito |
-
-> ✅ **100% gratuito e offline** — nenhuma API paga, nenhuma conexão com internet necessária para funcionar.
-
----
-
-## 📦 O que é o Tesseract OCR?
-
-O **Tesseract** é um motor de reconhecimento de caracteres (OCR — *Optical Character Recognition*) de código aberto, desenvolvido originalmente pela HP e mantido atualmente pelo Google. Em termos simples: **ele olha para uma imagem e transforma o que está escrito nela em texto**.
-
-### Como funciona?
-1. Recebe uma imagem (pode ser foto, screenshot, ou nosso canvas desenhado)
-2. Identifica regiões de texto na imagem
-3. Reconhece cada letra/símbolo
-4. Devolve o texto em formato de string Python
-
-### Como instalar o Tesseract?
-
-O Tesseract precisa ser instalado **no sistema operacional** (não é só um `pip install`). Depois, instalamos o `pytesseract` (wrapper Python) via pip.
-
-**Passo 1 — Instalar o Tesseract no Windows:**
-1. Acesse: https://github.com/UB-Mannheim/tesseract/wiki
-2. Baixe o instalador mais recente (ex: `tesseract-ocr-w64-setup-5.x.x.exe`)
-3. Durante a instalação, marque a opção **"Additional language data (download)"** e selecione **Português**
-4. Anote o caminho de instalação (geralmente `C:\Program Files\Tesseract-OCR\`)
-
-**Passo 2 — Adicionar ao PATH (opcional, mas recomendado):**
-- Pesquise "Variáveis de ambiente" no Windows
-- Em "Variáveis do sistema", encontre `Path` e adicione o caminho do Tesseract
-
-**Passo 3 — Instalar as dependências Python:**
-```bash
-pip install -r requirements.txt
-```
-
----
-
-## ▶️ Como executar
-
-```bash
-# Ativar o ambiente virtual (use Python 3.10, 3.11 ou 3.12)
-py -3.11 -m venv venv
-venv\Scripts\activate
-
-# Instalar dependências
-pip install -r requirements.txt
-
-# Executar o módulo principal
-python main.py
-```
-
----
-
-## 📁 Estrutura do projeto
+Este repositório está organizado em duas versões principais:
 
 ```
 TCC-SENAI-2026/
-├── README.md               ← Este arquivo
-├── requirements.txt        ← Dependências Python
-├── main.py                 ← Ponto de entrada principal
-├── modules/
-│   ├── camera.py           ← Captura de câmera e detecção de mão (MediaPipe)
-│   ├── canvas.py           ← Lógica do canvas de escrita
-│   ├── ocr.py              ← Reconhecimento de texto (Tesseract)
-│   ├── feedback.py         ← Geração de feedback para a criança
-│   └── tts.py              ← Síntese de voz (pyttsx3)
-├── assets/
-│   ├── fonts/              ← Fontes para a interface
-│   └── sounds/             ← Sons de feedback (opcional)
-└── data/
-    └── nomes_br.txt        ← Lista de nomes brasileiros comuns (para comparação)
+│
+├── README.md                  ← Este arquivo
+│
+├── versao-ptBR/               ← 🇧🇷 Versão em Português (completa e funcional)
+│   ├── main.py                   Código principal da aplicação
+│   ├── modules/                  Módulos: câmera, OCR, TTS, canvas, etc.
+│   ├── assets/                   Logo e recursos visuais
+│   ├── data/                     Banco de nomes para os exercícios
+│   ├── tessdata/                 Configurações do Tesseract OCR
+│   ├── requirements.txt          Dependências Python
+│   ├── Guia_do_Usuario.md        Manual de uso para o usuário final
+│   ├── Guia_de_Instalacao.md     Guia de instalação e solução de problemas
+│   └── DOCUMENTACAO_TCC_SENAI_2026.md  Documentação técnica do TCC
+│
+└── english-version/           ← 🇺🇸 Versão em Inglês (em breve)
 ```
 
+### 🇧🇷 `versao-ptBR/` — Versão em Português
+
+Versão completa e funcional do aplicativo, com toda a interface, áudio e conteúdo pedagógico em português brasileiro. Inclui os guias do usuário e de instalação.
+
+→ [Acessar a versão em português](./versao-ptBR/)
+
+### 🇺🇸 `english-version/` — Versão em Inglês
+
+Versão internacionalizada em desenvolvimento. Será publicada em breve com interface e conteúdo traduzidos para o inglês.
+
+→ [Em breve](./english-version/)
+
 ---
 
-## 👥 Equipe
+## Como Executar (versão ptBR)
 
-*Grupo 8: Miguel Augusto Rocha, Ana Luiza Ferreira Antônio, Maria Luiza Aguilar e Pedro Antunes.*
+```bash
+# Clone o repositório
+git clone https://github.com/seu-usuario/TCC-SENAI-2026.git
+cd TCC-SENAI-2026/versao-ptBR
+
+# Crie e ative o ambiente virtual
+python -m venv venv
+venv\Scripts\activate
+
+# Instale as dependências
+pip install -r requirements.txt
+
+# Execute o aplicativo
+python main.py
+```
+
+> Consulte o [`Guia_de_Instalacao.md`](./versao-ptBR/Guia_de_Instalacao.md) para instruções detalhadas, incluindo como usar o instalador portátil (`.exe`).
 
 ---
 
-## 🏫 Sobre
+## Licença
 
-Projeto desenvolvido como Trabalho de Conclusão de Curso (TCC) do Curso Técnico de Desenvolvimento de Sistemas do SENAI, 2026.  
-Evolução direta do projeto apresentado na Semana Aberta.
+Projeto acadêmico — TCC SENAI 2026. Todos os direitos reservados ao Grupo 8.

@@ -1,4 +1,4 @@
-# AlfaIA — .gitignore
+# TraçAÍ Educação — .gitignore
 
 # Ambiente virtual Python
 venv/
@@ -22,14 +22,19 @@ __pycache__/
 Thumbs.db
 desktop.ini
 
-# Arquivos gerados em runtime
-galeria/
-*.png
-*.jpg
-*.jpeg
-
-# Logs
+# Logs de runtime (não commitar)
 *.log
+alfaia_debug.log
+tracaai_debug.log
 
 # Dados sensíveis
 .env
+
+# Assets de imagem gerados (a logo fica em assets/, não na raiz)
+*.png
+*.jpg
+*.jpeg
+!versao-ptBR/assets/*.png
+!versao-ptBR/assets/*.ico
+!english-version/assets/*.png
+!english-version/assets/*.ico

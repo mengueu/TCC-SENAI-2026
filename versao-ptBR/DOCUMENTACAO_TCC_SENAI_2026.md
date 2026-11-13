@@ -571,3 +571,4 @@ PRESSMAN, Roger S.; MAXIM, Bruce R. **Engenharia de Software**: uma abordagem pr
 SOMMERVILLE, Ian. **Engenharia de Software**. 10. ed. São Paulo: Pearson Education do Brasil, 2019.
 
 ZHANG, Fan et al. **MediaPipe Hands: On-device Real-time Hand Tracking**. arXiv preprint arXiv:2006.10214, 2020. Disponível em: <https://arxiv.org/abs/2006.10214>. Acesso em: 10 nov. 2026.
+
