@@ -1,0 +1,20 @@
+# Dependências do TraçAÍ Educação — TCC SENAI 2026
+# Compatível com Python 3.10, 3.11 ou 3.12
+# Instale com: pip install -r requirements.txt
+
+# Câmera e visão computacional
+opencv-python>=4.8.0
+mediapipe==0.10.14
+numpy>=1.24.0
+
+# OCR — leitura da escrita da criança
+pytesseract>=0.3.10
+
+# Similaridade de texto — comparação com nomes/palavras
+python-Levenshtein>=0.23.0
+
+# Síntese de voz — feedback sonoro em português
+pyttsx3>=2.90
+
+# Processamento de imagem e fontes
+Pillow>=10.0.0
