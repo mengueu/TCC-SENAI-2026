@@ -99,14 +99,13 @@ O projeto inclui um instalador portátil que **não requer Python, Tesseract, Gi
 
 ---
 
-## 📁 Estrutura do Projeto
+## 📁 Estrutura desta Versão (versao-ptBR)
 
 ```
-TCC-SENAI-2026/
-├── main.py                       ← Ponto de entrada e todas as telas
+versao-ptBR/
+├── main.py                       ← Ponto de entrada e fluxo de telas
 ├── requirements.txt              ← Dependências Python
-├── Guia_do_Usuario.md            ← Manual do usuário
-├── DOCUMENTACAO_TCC_SENAI_2026.md← Documentação técnica do TCC
+├── instalar.bat                  ← Script automático de instalação da venv
 ├── assets/
 │   ├── logo.png                  ← Logo do TraçAÍ Educação (1024×1024 RGBA)
 │   └── logo.ico                  ← Ícone para o executável Windows
@@ -118,26 +117,52 @@ TCC-SENAI-2026/
 │   ├── matematica.py             ← Gerador de exercícios matemáticos
 │   ├── tts.py                    ← Síntese de voz (pyttsx3)
 │   ├── texto.py                  ← Renderização de texto na tela
-│   └── caminhos.py               ← Resolução de caminhos (dev ↔ .exe)
+│   └── caminhos.py               ← Resolução de caminhos portáteis (dev ↔ .exe)
 ├── data/
 │   └── nomes_br.txt              ← Lista de nomes brasileiros comuns
 └── tessdata/
-    └── digits.cfg                ← Config Tesseract para reconhecimento de dígitos
+    └── digits.cfg                ← Config Tesseract para dígitos
 ```
 
 ---
 
-## ▶️ Como executar (desenvolvimento)
+## 📥 Como Instalar e Executar
 
+### 🚀 Método Fácil: Baixar o Aplicativo Pronto (Recomendado)
+Se você quer apenas usar o programa sem precisar configurar nada:
+
+1. Acesse o link de download direto da versão mais recente:  
+   👉 **[Baixar Instalador Pronto (.ZIP) em Releases](https://github.com/mengueu/TCC-SENAI-2026/releases/latest)**
+2. Baixe o arquivo `.zip` disponibilizado (ex.: `TracAI_TCC_SENAI_Instalador.zip`);
+3. Extraia o conteúdo no seu computador;
+4. Dê 2 cliques em `Instalar_TracaAI.bat` para criar o atalho na Área de Trabalho (ou abra diretamente pelo `TracaAI.exe`).
+
+> ✨ **Vantagem:** Não precisa instalar Python, nem Tesseract, nem bibliotecas. Tudo já vem configurado!
+
+---
+
+### 🛠️ Método Manual: Instalação via Código-Fonte (Desenvolvedores)
+Caso queira rodar o projeto manualmente pelo Python, você precisará instalar:
+
+#### 1. Pré-requisitos necessários:
+- **Python 3.11:** Baixe em [python.org](https://www.python.org/downloads/) *(marque a opção **"Add Python to PATH"** durante a instalação)*.
+- **Tesseract OCR (Windows):** Baixe em [UB-Mannheim Tesseract Wiki](https://github.com/UB-Mannheim/tesseract/wiki). Na tela de componentes, marque o idioma **Portuguese** (Português).
+
+#### 2. Instalação das bibliotecas e execução:
+
+**Opção Automática:**
+Basta dar 2 cliques no arquivo `instalar.bat` desta pasta. Ele criará o ambiente virtual `venv`, instalará todas as dependências do `requirements.txt` e testará o Tesseract automaticamente.
+
+**Opção Manual pelo Terminal:**
 ```bash
-# Criar e ativar ambiente virtual (Python 3.11 recomendado)
-py -3.11 -m venv venv
+# Ativar ou criar o ambiente virtual
+python -m venv venv
 venv\Scripts\activate
 
-# Instalar dependências
+# Instalar as bibliotecas
 pip install -r requirements.txt
 
-# Executar
+# Executar a aplicação
 python main.py
 ```
 

@@ -18,35 +18,53 @@
 
 ---
 
-## 📥 Como Usar o TraçAÍ Educação
+## 📥 Como Instalar e Executar
 
-Você pode utilizar o projeto de duas formas, dependendo do seu perfil:
+Escolha a forma mais conveniente para você:
 
-### 🌟 Opção 1: Baixar o Aplicativo Pronto (Recomendado para Usuários e Professores)
-> **Não precisa instalar Python, bibliotecas nem o Tesseract!** Tudo já vem embutido em um pacote executável autônomo.
+### 🚀 Método Fácil: Baixar o Aplicativo Pronto (Recomendado)
+Se você quer apenas usar o aplicativo sem precisar configurar nada:
 
-1. Acesse a aba de lançamentos: **[👉 Baixar Instalador Windows (.ZIP) em Releases](https://github.com/mengueu/TCC-SENAI-2026/releases)**;
-2. Baixe o arquivo `TracAI_TCC_SENAI_Instalador.zip`;
-3. Extraia o arquivo ZIP no seu computador;
-4. Dê 2 cliques em `Instalar_TracaAI.bat` (ele criará o atalho na sua Área de Trabalho) ou abra diretamente pelo `TracaAI.exe`.
+1. Clique no link para acessar e baixar a versão mais recente para Windows:  
+   👉 **[Clique aqui para Baixar o Instalador (GitHub Releases)](https://github.com/mengueu/TCC-SENAI-2026/releases/latest)**
+2. Baixe o arquivo `.zip` do lançamento (ex.: `TracAI_TCC_SENAI_Instalador.zip`);
+3. Extraia o arquivo ZIP em qualquer pasta do seu computador;
+4. Dê 2 cliques no arquivo **`Instalar_TracaAI.bat`** (ele criará um atalho prático na sua Área de Trabalho e Menu Iniciar) ou execute diretamente o **`TracaAI.exe`** dentro da pasta.
+
+> ✨ **Vantagem:** Você **não precisa** instalar Python, nem Tesseract OCR, nem bibliotecas. Tudo já vem embutido e pronto para uso!
 
 ---
 
-### 💻 Opção 2: Executar pelo Código-Fonte (Para Desenvolvedores e Avaliadores)
-Se você deseja inspecionar, modificar ou executar o código em Python:
+### 🛠️ Método Manual: Instalação via Código-Fonte (Desenvolvedores)
+Caso você queira inspecionar o código ou rodar o projeto manualmente pelo Python, você precisará instalar os pré-requisitos antes:
 
+#### 1. Pré-requisitos necessários:
+- **Python 3.11:** Baixe em [python.org](https://www.python.org/downloads/) *(certifique-se de marcar a opção **"Add Python to PATH"** durante a instalação)*.
+- **Tesseract OCR (Windows):** Baixe o instalador em [UB-Mannheim Tesseract Wiki](https://github.com/UB-Mannheim/tesseract/wiki). Na etapa de seleção de componentes do instalador, expanda *Additional language data* e marque o idioma **Portuguese** (Português).
+
+#### 2. Instalação e execução do código:
+
+**Opção Automática (com 1 clique):**
+Abra a pasta `versao-ptBR` e dê 2 cliques no arquivo:
+```
+👉 versao-ptBR/instalar.bat
+```
+*(Ele criará o ambiente virtual `venv`, instalará todas as dependências do `requirements.txt` e verificará o Tesseract automaticamente).*
+
+**Opção Manual pelo Terminal:**
 ```bash
-# 1. Clone o repositório
+# 1. Clone o repositório e acesse a pasta da versão em português:
 git clone https://github.com/mengueu/TCC-SENAI-2026.git
 cd TCC-SENAI-2026/versao-ptBR
 
-# 2. Execute o instalador automático de dependências
-instalar.bat
-
-# 3. Ou instale manualmente:
+# 2. Crie e ative o ambiente virtual:
 python -m venv venv
 venv\Scripts\activate
+
+# 3. Instale as bibliotecas necessárias:
 pip install -r requirements.txt
+
+# 4. Inicie o aplicativo:
 python main.py
 ```
 
