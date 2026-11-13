@@ -20,7 +20,7 @@
 
 ## Sobre o Projeto
 
-O **TraçAÍ Educação** é uma aplicação desktop que usa visão computacional para auxiliar crianças em processo de alfabetização. O aluno escreve letras e números **no ar com a própria mão** na frente da webcam, e uma IA analisa o que foi escrito em tempo real, fornecendo feedback imediato.
+O **TraçAÍ Educação** é uma aplicação desktop que usa visão computacional para auxiliar crianças em processo de alfabetização. O aluno escreve letras e números **no ar com a própria mão** na frente da webcam, e uma IA analisa o que foi escrito em tempo real, fornecendo feedback imediato por texto e voz.
 
 **Grupo 8:**  
 Miguel Augusto Rocha · Ana Luiza Ferreira Antônio · Maria Luiza Aguilar · Pedro Antunes
@@ -29,60 +29,52 @@ Miguel Augusto Rocha · Ana Luiza Ferreira Antônio · Maria Luiza Aguilar · Pe
 
 ## Estrutura do Repositório
 
-Este repositório está organizado em duas versões principais:
+O repositório é organizado em duas versões:
 
 ```
 TCC-SENAI-2026/
 │
-├── README.md                  ← Este arquivo
+├── README.md                  ← Informações gerais do projeto
 │
-├── versao-ptBR/               ← 🇧🇷 Versão em Português (completa e funcional)
-│   ├── main.py                   Código principal da aplicação
-│   ├── modules/                  Módulos: câmera, OCR, TTS, canvas, etc.
-│   ├── assets/                   Logo e recursos visuais
-│   ├── data/                     Banco de nomes para os exercícios
+├── versao-ptBR/               ← 🇧🇷 Versão em Português (código-fonte e recursos)
+│   ├── main.py                   Ponto de entrada da aplicação
+│   ├── modules/                  Módulos de câmera, IA/OCR, áudio e interface
+│   ├── assets/                   Logo e identidade visual
+│   ├── data/                     Base de nomes para os exercícios
 │   ├── tessdata/                 Configurações do Tesseract OCR
-│   ├── requirements.txt          Dependências Python
-│   ├── Guia_do_Usuario.md        Manual de uso para o usuário final
-│   ├── Guia_de_Instalacao.md     Guia de instalação e solução de problemas
-│   └── DOCUMENTACAO_TCC_SENAI_2026.md  Documentação técnica do TCC
+│   └── README.md                 Manual técnico e pedagógico detalhado
 │
 └── english-version/           ← 🇺🇸 Versão em Inglês (em breve)
 ```
 
 ### 🇧🇷 `versao-ptBR/` — Versão em Português
 
-Versão completa e funcional do aplicativo, com toda a interface, áudio e conteúdo pedagógico em português brasileiro. Inclui os guias do usuário e de instalação.
+Versão completa e funcional do aplicativo em português brasileiro. Contém a interface, retorno por voz (TTS), reconhecimento óptico de caracteres com Tesseract e exercícios de escrita e operações matemáticas.
 
-→ [Acessar a versão em português](./versao-ptBR/)
+→ [Acessar a pasta versao-ptBR](./versao-ptBR/)
 
 ### 🇺🇸 `english-version/` — Versão em Inglês
 
-Versão internacionalizada em desenvolvimento. Será publicada em breve com interface e conteúdo traduzidos para o inglês.
+Versão internacionalizada atualmente em desenvolvimento para atender outros idiomas.
 
 → [Em breve](./english-version/)
 
 ---
 
-## Como Executar (versão ptBR)
+## Como Executar
+
+Para executar o código-fonte em Python diretamente:
 
 ```bash
 # Clone o repositório
 git clone https://github.com/seu-usuario/TCC-SENAI-2026.git
 cd TCC-SENAI-2026/versao-ptBR
 
-# Crie e ative o ambiente virtual
-python -m venv venv
-venv\Scripts\activate
-
-# Instale as dependências
-pip install -r requirements.txt
-
 # Execute o aplicativo
 python main.py
 ```
 
-> Consulte o [`Guia_de_Instalacao.md`](./versao-ptBR/Guia_de_Instalacao.md) para instruções detalhadas, incluindo como usar o instalador portátil (`.exe`).
+Também disponibilizamos o instalador portátil autônomo (empacotado com Tesseract e dependências integradas), que não requer a instalação do Python.
 
 ---
 

@@ -30,6 +30,11 @@ tracaai_debug.log
 # Dados sensíveis
 .env
 
+# Arquivos compactados e binários grandes (GitHub bloqueia push de arquivos > 100 MB)
+*.zip
+*.tar.gz
+*.rar
+
 # Assets de imagem gerados (a logo fica em assets/, não na raiz)
 *.png
 *.jpg
